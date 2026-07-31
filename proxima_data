@@ -1,0 +1,167 @@
+###############################################################################
+# Organização e Arquitetura de Computadores I
+# Exercício-Programa Assembly MIPS
+#
+# Enunciado:
+# 7. (b) Escreva uma função que tem como parâmetros de entrada e saída três números
+# inteiros, dia, mês e ano, representando uma data, e modifica esses inteiros
+# de forma que eles representem o dia seguinte.
+###############################################################################
+
+.data
+    dia: .word 28
+    mes: .word 2
+    ano: .word 2024
+
+    dias_mes:
+        .word 31,28,31,30,31,30,31,31,30,31,30,31
+
+
+.text
+.globl main
+
+main:
+    la   $a0, dia
+    la   $a1, mes
+    la   $a2, ano
+
+    jal  proximo_dia
+
+    # Imprime dia.
+    lw   $a0, dia
+    li   $v0, 1
+    syscall
+
+    li   $a0, '/'
+    li   $v0, 11
+    syscall
+
+    # Imprime mês.
+    lw   $a0, mes
+    li   $v0, 1
+    syscall
+
+    li   $a0, '/'
+    li   $v0, 11
+    syscall
+
+    # Imprime ano
+    lw   $a0, ano
+    li   $v0, 1
+    syscall
+
+    # Encerra o programa.
+    li   $v0, 10
+    syscall
+
+# verificação de ano bissexto
+#
+# $a0 = ano
+# $v0 = 1 se bissexto; 0 caso contrário
+
+bissexto:
+    li   $t0, 4
+    div  $a0, $t0
+    mfhi $t1
+    bne  $t1, $zero, nao
+
+    li   $t0, 100
+    div  $a0, $t0
+    mfhi $t1
+    bne  $t1, $zero, sim
+
+    li   $t0, 400
+    div  $a0, $t0
+    mfhi $t1
+    beq  $t1, $zero, sim
+
+nao:
+    li   $v0, 0
+    jr   $ra
+
+sim:
+    li   $v0, 1
+    jr   $ra
+
+
+# void proximo_dia(int *dia, int *mes, int *ano)
+#
+# $a0 = endereço de dia
+# $a1 = endereço de mês
+# $a2 = endereço de ano
+
+proximo_dia:
+    # Preserva o retorno e os endereços recebidos.
+    addi $sp, $sp, -16
+    sw   $ra, 12($sp)
+    sw   $a0, 8($sp)
+    sw   $a1, 4($sp)
+    sw   $a2, 0($sp)
+
+    lw   $t0, 0($a0)        # dia
+    lw   $t1, 0($a1)        # mês
+    lw   $t2, 0($a2)        # ano
+
+    # Procura os dias do mês na tabela.
+    la   $t3, dias_mes
+    li   $t4, 1
+
+loop:
+    beq  $t4, $t1, fim_loop
+    addi $t3, $t3, 4
+    addi $t4, $t4, 1
+    j    loop
+
+fim_loop:
+    lw   $t5, 0($t3)        # limite do mês (mais dias do que o especificado no vetor do .data
+
+    # Se não for fevereiro, continua normalmente.
+    li   $t6, 2
+    bne  $t1, $t6, continua
+
+    # caso do mes de Fevereiro: verifica se o ano é bissexto.
+    move $a0, $t2
+    jal  bissexto
+
+    beq  $v0, $zero, continua
+    li   $t5, 29
+
+continua:
+    # recupera os endereços recebidos.
+    lw   $a0, 8($sp)
+    lw   $a1, 4($sp)
+    lw   $a2, 0($sp)
+
+    # recarrega dia, mês e ano
+    lw   $t0, 0($a0)
+    lw   $t1, 0($a1)
+    lw   $t2, 0($a2)
+
+    addi $t0, $t0, 1        # dia++
+
+    # Se dia não ultrapassou o limite, ele salva.
+    slt  $t6, $t5, $t0
+    beq  $t6, $zero, salva
+
+    # Virada do mês.
+    li   $t0, 1
+    addi $t1, $t1, 1
+
+    # Verifica a virada do ano
+    li   $t6, 12
+    slt  $t7, $t6, $t1
+    beq  $t7, $zero, salva
+
+    li   $t1, 1
+    addi $t2, $t2, 1
+
+salva:
+    sw   $t0, 0($a0)
+    sw   $t1, 0($a1)
+    sw   $t2, 0($a2)
+
+    # restaura o endereço de retorno. (uso do stack pointer)
+    lw   $ra, 12($sp)
+    addi $sp, $sp, 16
+
+    jr   $ra
